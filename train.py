@@ -103,6 +103,7 @@ if __name__ == "__main__":
     # Argument Parsing
     parser = argparse.ArgumentParser(description="Train a sign language recognition model.")
     parser.add_argument("--device", type=str, default="cpu", choices=["cpu", "cuda"], help="Device to use for training (cpu or cuda)")
+    parser.add_argument("--num_epochs", type=int, default=20, help="Number of epochs to train the model")
     args = parser.parse_args()
 
     # Configuration
@@ -112,4 +113,4 @@ if __name__ == "__main__":
     os.makedirs(output_directory, exist_ok=True)
 
     # Train the Model
-    train_model(data_directory, output_directory, num_classes, device=args.device)
+    train_model(data_directory, output_directory, num_classes, device=args.device, num_epochs=args.num_epochs)
