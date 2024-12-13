@@ -9,6 +9,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from utils.featureExtractor import FeatureExtractor
 from utils.signLanguageTransformer import SignLanguageTransformer
 from tqdm import tqdm
+import argparse
 
 # Dataset Class
 class MotionDataset(Dataset):
@@ -37,9 +38,10 @@ class MotionDataset(Dataset):
         return image, label
 
 # Training Function
-def train_model(data_dir, output_dir, num_classes, batch_size=16, num_epochs=20, learning_rate=1e-3):
+def train_model(data_dir, output_dir, num_classes, device, batch_size=16, num_epochs=20, learning_rate=1e-3):
     # Load Feature Extractor
     feature_extractor = FeatureExtractor()
+    feature_extractor.to(device)
 
     # Dataset and DataLoader
     transform = transforms.Compose([
@@ -52,7 +54,7 @@ def train_model(data_dir, output_dir, num_classes, batch_size=16, num_epochs=20,
     data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
     # Model, Optimizer, and Loss Function
-    model = SignLanguageTransformer(input_dim=512, num_classes=num_classes).to('cuda')
+    model = SignLanguageTransformer(input_dim=512, num_classes=num_classes).to(device)
     optimizer = Adam(model.parameters(), lr=learning_rate)
     scheduler = ReduceLROnPlateau(optimizer, 'min', patience=3, factor=0.5)
     criterion = nn.CrossEntropyLoss()
@@ -66,11 +68,14 @@ def train_model(data_dir, output_dir, num_classes, batch_size=16, num_epochs=20,
 
         for images, labels in tqdm(data_loader, desc=f"Epoch {epoch+1}/{num_epochs}"):
             # Extract Features
-            images = images.to('cuda')
+            images = images.to(device)
             features = feature_extractor(images)
+            
+            # Ensure the features are in the correct shape
+            features = features.unsqueeze(1)
 
             # Forward Pass
-            labels = labels.to('cuda')
+            labels = labels.to(device)
             outputs = model(features)
             loss = criterion(outputs, labels)
 
@@ -95,6 +100,11 @@ def train_model(data_dir, output_dir, num_classes, batch_size=16, num_epochs=20,
         torch.save(model.state_dict(), os.path.join(output_dir, f"model_epoch_{epoch+1}.pth"))
 
 if __name__ == "__main__":
+    # Argument Parsing
+    parser = argparse.ArgumentParser(description="Train a sign language recognition model.")
+    parser.add_argument("--device", type=str, default="cpu", choices=["cpu", "cuda"], help="Device to use for training (cpu or cuda)")
+    args = parser.parse_args()
+
     # Configuration
     data_directory = "datasets"  # Path to the dataset
     output_directory = "output_models"  # Path to save model checkpoints
@@ -102,4 +112,4 @@ if __name__ == "__main__":
     os.makedirs(output_directory, exist_ok=True)
 
     # Train the Model
-    train_model(data_directory, output_directory, num_classes)
+    train_model(data_directory, output_directory, num_classes, device=args.device)
