@@ -10,6 +10,7 @@ from utils.featureExtractor import FeatureExtractor
 from utils.signLanguageTransformer import SignLanguageTransformer
 from tqdm import tqdm
 import argparse
+import json
 
 # Dataset Class
 class MotionDataset(Dataset):
@@ -24,8 +25,11 @@ class MotionDataset(Dataset):
             if os.path.isdir(class_path):
                 sequences = {}
                 for img_file in sorted(os.listdir(class_path)):
-                    if img_file.endswith(('.jpg', '.png', '.jpeg')):
-                        base_name = img_file.split('__')[0]
+                    if img_file.endswith(('.jpg')):
+                        if '__' in img_file:
+                            base_name = img_file.split('__')[1].split('.jpg')[0]
+                        else:
+                            base_name = "normal"
                         if base_name not in sequences:
                             sequences[base_name] = []
                         sequences[base_name].append(os.path.join(class_path, img_file))
@@ -127,8 +131,8 @@ if __name__ == "__main__":
 
     # Configuration
     data_directory = "datasets"  # Path to the dataset
-    output_directory = "models"  # Path to save model checkpoints
-    num_classes = len(os.listdir(data_directory))  # Number of classes (folders)
+    output_directory = "model"  # Path to save model checkpoints
+    num_classes = len([name for name in os.listdir(data_directory) if os.path.isdir(os.path.join(data_directory, name))])  # Number of classes (folders)
     os.makedirs(output_directory, exist_ok=True)
 
     # Train the Model
