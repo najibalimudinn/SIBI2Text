@@ -1,7 +1,7 @@
 datasets/*
-!datasets/.gitkeep
+!datasets/placeDatasetHere.txt
 model/*
-!model/.gitkeep
+!model/saveModelHere.txt
 __pycache__/
 */__pycache__/
 runs/
