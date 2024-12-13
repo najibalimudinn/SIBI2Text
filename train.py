@@ -16,26 +16,44 @@ class MotionDataset(Dataset):
     def __init__(self, root_dir, transform=None):
         self.root_dir = root_dir
         self.transform = transform
-        self.data = []  # Menyimpan path file dan label
+        self.data = []  # Store sequences of image paths and labels
 
         # Load dataset structure
         for label, class_dir in enumerate(sorted(os.listdir(root_dir))):
             class_path = os.path.join(root_dir, class_dir)
             if os.path.isdir(class_path):
-                for img_file in os.listdir(class_path):
+                sequences = {}
+                for img_file in sorted(os.listdir(class_path)):
                     if img_file.endswith(('.jpg', '.png', '.jpeg')):
-                        img_path = os.path.join(class_path, img_file)
-                        self.data.append((img_path, label))
+                        base_name = img_file.split('__')[0]
+                        if base_name not in sequences:
+                            sequences[base_name] = []
+                        sequences[base_name].append(os.path.join(class_path, img_file))
+                for seq_files in sequences.values():
+                    # Ensure each sequence has 10 images (0 to 9) and their augmentations
+                    if len(seq_files) >= 10:
+                        self.data.append((seq_files, label))
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        img_path, label = self.data[idx]
-        image = read_image(img_path).float() / 255.0  # Normalize to [0, 1]
+        img_paths, label = self.data[idx]
+        images = [read_image(img_path).float() / 255.0 for img_path in img_paths]  # Normalize to [0, 1]
         if self.transform:
-            image = self.transform(image)
-        return image, label
+            images = [self.transform(image) for image in images]
+        return torch.stack(images), label  # Return sequence of images and label
+
+def pad_collate_fn(batch):
+    max_length = max([item[0].size(0) for item in batch])
+    padded_batch = []
+    labels = []
+    for item, label in batch:
+        padding = torch.zeros((max_length - item.size(0), *item.size()[1:]))
+        padded_item = torch.cat((item, padding), dim=0)
+        padded_batch.append(padded_item)
+        labels.append(label)
+    return torch.stack(padded_batch), torch.tensor(labels, dtype=torch.long)
 
 # Training Function
 def train_model(data_dir, output_dir, num_classes, device, batch_size=16, num_epochs=20, learning_rate=1e-3):
@@ -51,7 +69,7 @@ def train_model(data_dir, output_dir, num_classes, device, batch_size=16, num_ep
         transforms.ColorJitter(brightness=0.2, contrast=0.2),
     ])
     dataset = MotionDataset(data_dir, transform=transform)
-    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+    data_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, collate_fn=pad_collate_fn)
 
     # Model, Optimizer, and Loss Function
     model = SignLanguageTransformer(input_dim=512, num_classes=num_classes).to(device)
@@ -66,16 +84,17 @@ def train_model(data_dir, output_dir, num_classes, device, batch_size=16, num_ep
         correct = 0
         total = 0
 
-        for images, labels in tqdm(data_loader, desc=f"Epoch {epoch+1}/{num_epochs}"):
+        for sequences, labels in tqdm(data_loader, desc=f"Epoch {epoch+1}/{num_epochs}"):
+            sequences, labels = sequences.to(device), labels.to(device)
+            batch_size, sequence_length, channels, height, width = sequences.size()
+            sequences = sequences.view(batch_size * sequence_length, channels, height, width)
+
             # Extract Features
-            images = images.to(device)
-            features = feature_extractor(images)
-            
-            # Ensure the features are in the correct shape
-            features = features.unsqueeze(1)
+            with torch.no_grad():
+                features = feature_extractor(sequences)
+            features = features.view(batch_size, sequence_length, -1)
 
             # Forward Pass
-            labels = labels.to(device)
             outputs = model(features)
             loss = criterion(outputs, labels)
 
@@ -108,7 +127,7 @@ if __name__ == "__main__":
 
     # Configuration
     data_directory = "datasets"  # Path to the dataset
-    output_directory = "output_models"  # Path to save model checkpoints
+    output_directory = "models"  # Path to save model checkpoints
     num_classes = len(os.listdir(data_directory))  # Number of classes (folders)
     os.makedirs(output_directory, exist_ok=True)
 
