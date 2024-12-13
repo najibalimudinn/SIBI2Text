@@ -1,0 +1,7 @@
+datasets/*
+!datasets/.gitkeep
+model/*
+!model/.gitkeep
+__pycache__/
+*/__pycache__/
+runs/
