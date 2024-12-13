@@ -7,6 +7,7 @@ from torchvision.io import read_image
 from torch.optim import Adam
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from utils.featureExtractor import FeatureExtractor
+from utils.signLanguageTransformer import SignLanguageTransformer
 from tqdm import tqdm
 
 # Dataset Class
