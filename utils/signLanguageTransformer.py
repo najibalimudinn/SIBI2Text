@@ -1,5 +1,6 @@
 import torch.nn as nn
 
+# Model Definition (Transformer)
 class SignLanguageTransformer(nn.Module):
     def __init__(self, input_dim, num_classes):
         super(SignLanguageTransformer, self).__init__()
@@ -11,5 +12,6 @@ class SignLanguageTransformer(nn.Module):
     def forward(self, x):
         x = self.embedding(x)
         x = self.transformer(x)
-        x = self.classifier(x[:, 0, :])  # Menggunakan token pertama untuk klasifikasi
+        pooled = x.mean(dim=1)  # Pooling over sequence length
+        x = self.classifier(pooled)
         return x
